@@ -13,31 +13,42 @@
  */
 
 /*jslint onevar: true, strict: true, browser: true */
-/*global window, jQuery, google */
+/*global window, jQuery, google, gadgets */
 "use strict";
-(function($, doc, jwave, fn) {
+(function($, doc, jwave, fn, consts) {
 	
-	jwave = $.fn.jwave = function(id, options) {
+	consts = {
+		ERROR_ID: " is not a valid Google Wav ID, for details refer to http://wave-api-faq.appspot.com/#waveid",
+		FUNCTION: "function",
+		UNDEFINED: "undefined",
+		SCRIPT: "script",
+		head: doc.getElementsByTagName("head")[0]
+	};
+	
+	jwave = $.fn.jwave = function(id, options, callback) {
 		
 		if(!fn.isWaveId(id)) {
-			throw(id + fn.constants.ERROR_ID);
+			throw(id + consts.ERROR_ID);
 		}
 		
-		options		= options || {};
-		options.id	= id;
+		if(typeof options === consts.FUNCTION) {
+			callback = options;
+			options = null;
+		}
+		
+		if(typeof callback !== consts.FUNCTION) {
+			callback = $.noop;
+		}
+		
+		options				= options || {};
+		options.id			= id;
+		options.callback	= callback;
 		
 		this.each(fn.onEachElement(options));
 		
 	};
 	
 	fn = jwave.fn = {
-	
-		constants: {
-			ERROR_ID: " is not a valid Google Wav ID, for details refer to http://wave-api-faq.appspot.com/#waveid",
-			ERROR_DEPENDENCY: "A dependency error occurred while trying to initialize jWave.",
-			FUNCTION: "function",
-			UNDEFINED: "undefined"
-		},
 		
 		loaded: false,
 		
@@ -61,21 +72,61 @@
 		
 		getWaveHandler: function(target, options) {
 			
-			return function(panel) {
+			return function(panel, callback) {
 				options.target = target;
 				panel = new google.wave.WavePanel(options);
+				callback = fn.bindCallback(panel, options.callback);
 				panel.loadWave(options.id);
+				doc.getElementById(panel.getFrameId()).onload = callback;
 			};
 			
 		},
 		
-		onGoogleApiReady: function(i, len) {
+		bindCallback: function(panel, callback) {
+			
+			return function() {
+				callback.call(panel, panel);
+			};
+		
+		},
+		
+		onGoogleApiReady: function(script) { 
+			
+			if(typeof google !== consts.UNDEFINED && typeof gadgets !== consts.UNDEFINED) {
+				google.load("wave", "1", {callback: fn.onGoogleWaveApiReady});
+			}
+			
+		},
+		
+		onGoogleWaveApiReady: function(i, len) {
 			
 			fn.loaded = true;
 			len = fn.queue.length;
 			for(i=0;i<len;i++) {
 				fn.queue[i].call(fn.queue);
-			} 
+			}
+			
+		},
+		
+		loadGoogleApi: function(script) {
+			
+			if(typeof google === consts.UNDEFINED || typeof gadgets === consts.UNDEFINED) {
+				if (typeof gadgets === consts.UNDEFINED) {
+					script		= doc.createElement(consts.SCRIPT);
+					script.src	= "https://wave.google.com/gadgets/js/core:rpc";
+					script.onload = fn.onGoogleApiReady;
+					consts.head.appendChild(script);	
+				}
+				if (typeof google === consts.UNDEFINED) {
+					script		= doc.createElement(consts.SCRIPT);
+					script.src	= "http://www.google.com/jsapi?callback=jQuery.fn.jwave.fn.onGoogleApiReady";
+					consts.head.appendChild(script);	
+				}
+			} else if(typeof google.wave === consts.UNDEFINED) {
+				fn.onGoogleApiReady();
+			} else {
+				fn.onGoogleWaveApiReady();
+			}
 			
 		},
 		
@@ -85,13 +136,6 @@
 		
 	};
 	
-	if(typeof google === fn.constants.UNDEFINED ||
-	   typeof google.wave === fn.constants.UNDEFINED ||
-	   typeof google.wave.WavePanel !== fn.constants.FUNCTION) {
-		$.fn.jwave = null;
-		throw(fn.constants.ERROR_GOOGLE);
-	} else {
-		google.setOnLoadCallback(fn.onGoogleApiReady);
-	}
+	$(fn.loadGoogleApi);
 	
 })(jQuery, document);

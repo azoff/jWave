@@ -11,12 +11,13 @@
 
 <body>
     <div id="wave"></div>
-    <script src="http://www.google.com/jsapi?autoload=%7B%22modules%22%3A%5B%7B%22name%22%3A%22wave%22%2C%22version%22%3A%221%22%7D%5D%7D"></script>
     <script src="http://code.jquery.com/jquery-latest.js"></script>
     <script src="jquery.jwave.js"></script>
     <script>
 		$(function(){
-			$("div#wave").jwave("googlewave.com!w+1EznGiPwA", { header:false });
+			$("div#wave").jwave("googlewave.com!w+1EznGiPwA", { header:false }, function(panel) {
+			    console.log("How can I tell if you are logged in?");
+			});
 		});
     </script>
 </body>
